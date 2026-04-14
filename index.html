@@ -10,40 +10,46 @@
     <style>
         .grid-container {
             display: grid;
-            grid-template-columns: 80px repeat(7, 1fr);
-            grid-template-rows: 50px repeat(14, 60px);
+            grid-template-columns: 100px repeat(14, 1fr);
+            grid-template-rows: 50px repeat(7, 80px);
         }
-        .time-label, .day-label {
+        .label-cell {
             display: flex;
             align-items: center;
             justify-content: center;
-            font-weight: 600;
+            font-weight: 700;
             background: #f8fafc;
             border: 1px solid #e2e8f0;
-            font-size: 0.8rem;
+            font-size: 0.7rem;
             color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
         }
         .grid-cell {
             border: 1px solid #f1f5f9;
             position: relative;
+            background: white;
         }
         .block {
             position: absolute;
-            inset: 2px;
-            border-radius: 6px;
-            padding: 8px;
+            inset: 4px;
+            border-radius: 8px;
+            padding: 10px;
             font-size: 0.75rem;
-            cursor: move;
+            cursor: pointer;
             user-select: none;
             z-index: 10;
             overflow: hidden;
-            border: 1px solid rgba(0,0,0,0.05);
+            border: 1px solid rgba(0,0,0,0.08);
             display: flex;
             flex-direction: column;
             gap: 2px;
+            transition: transform 0.2s, box-shadow 0.2s;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
         }
         .block:hover {
-            filter: brightness(0.95);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
             z-index: 20;
         }
         .conflict {
@@ -55,53 +61,50 @@
             70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
             100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
         }
-        .dragging { opacity: 0.5; }
         #modal.hidden { display: none; }
         #modal:not(.hidden) { display: flex; }
     </style>
 </head>
-<body class="bg-slate-50 min-h-screen p-4 md:p-8">
-    <div class="max-w-6xl mx-auto bg-white rounded-xl shadow-xl p-6" id="capture-area">
-        <header class="flex flex-col md:flex-row justify-between items-center gap-4 mb-8">
+<body class="bg-slate-50 min-h-screen p-4 md:p-12">
+    <div class="max-w-7xl mx-auto bg-white rounded-2xl shadow-2xl p-8 border border-slate-200" id="capture-area">
+        <header class="flex flex-col md:flex-row justify-between items-center gap-6 mb-10">
             <div>
-                <h1 class="text-3xl font-extrabold text-slate-900 tracking-tight">Cos' week</h1>
-                <p class="text-slate-500 text-sm mt-1">Interactive Visual Scheduler</p>
+                <h1 class="text-4xl font-black text-slate-900 tracking-tight">Cos' week</h1>
+                <p class="text-slate-500 font-medium mt-1">Visual Schedule Builder & Conflict Detector</p>
             </div>
-            <div class="flex gap-3">
-                <button onclick="addBlock()" class="bg-indigo-600 text-white px-5 py-2.5 rounded-xl flex items-center gap-2 hover:bg-indigo-700 transition-all shadow-sm font-medium">
-                    <i data-lucide="plus" class="w-4 h-4"></i> Add Event
+            <div class="flex gap-4">
+                <button onclick="addBlock()" class="bg-indigo-600 text-white px-6 py-3 rounded-xl flex items-center gap-2 hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200 font-bold">
+                    <i data-lucide="plus-circle" class="w-5 h-5"></i> Add Event
                 </button>
-                <button onclick="downloadImage()" class="bg-white text-slate-700 border border-slate-200 px-5 py-2.5 rounded-xl flex items-center gap-2 hover:bg-slate-50 transition-all shadow-sm font-medium">
-                    <i data-lucide="camera" class="w-4 h-4"></i> Export PNG
+                <button onclick="downloadImage()" class="bg-white text-slate-700 border border-slate-200 px-6 py-3 rounded-xl flex items-center gap-2 hover:bg-slate-50 transition-all shadow-sm font-bold">
+                    <i data-lucide="share" class="w-5 h-5"></i> Export PNG
                 </button>
             </div>
         </header>
 
-        <div id="scheduler" class="grid-container rounded-xl overflow-hidden border border-slate-200 shadow-inner">
-            <div class="day-label">Time</div>
-            <div class="day-label">Mon</div>
-            <div class="day-label">Tue</div>
-            <div class="day-label">Wed</div>
-            <div class="day-label">Thu</div>
-            <div class="day-label">Fri</div>
-            <div class="day-label">Sat</div>
-            <div class="day-label">Sun</div>
+        <div id="scheduler" class="grid-container rounded-xl overflow-hidden border border-slate-200 shadow-inner bg-slate-100">
+            <!-- Headers will be injected here -->
         </div>
+        
+        <footer class="mt-8 flex justify-between items-center text-slate-400 text-xs font-semibold uppercase tracking-widest">
+            <span>&copy; 2026 Cos' week</span>
+            <span class="flex items-center gap-2">Share your week <i data-lucide="heart" class="w-3 h-3 text-red-400"></i></span>
+        </footer>
     </div>
 
     <!-- Modal -->
-    <div id="modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm hidden items-center justify-center z-50 p-4">
-        <div class="bg-white rounded-2xl p-8 w-full max-w-md shadow-2xl scale-in-center">
-            <h2 id="modalTitle" class="text-2xl font-bold text-slate-900 mb-6">Create Event</h2>
-            <div class="space-y-5">
+    <div id="modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-md hidden items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-3xl p-10 w-full max-w-lg shadow-2xl border border-slate-100">
+            <h2 id="modalTitle" class="text-3xl font-black text-slate-900 mb-8">Create Event</h2>
+            <div class="space-y-6">
                 <div>
-                    <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Event Name</label>
-                    <input type="text" id="eventTitle" placeholder="e.g. Computer Architecture" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 transition-all">
+                    <label class="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Event Title</label>
+                    <input type="text" id="eventTitle" placeholder="e.g. Computer Architecture" class="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all font-medium text-slate-700">
                 </div>
-                <div class="grid grid-cols-2 gap-4">
+                <div class="grid grid-cols-2 gap-6">
                     <div>
-                        <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Day</label>
-                        <select id="eventDay" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 transition-all">
+                        <label class="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Day</label>
+                        <select id="eventDay" class="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all font-medium text-slate-700 appearance-none">
                             <option value="1">Monday</option>
                             <option value="2">Tuesday</option>
                             <option value="3">Wednesday</option>
@@ -112,30 +115,27 @@
                         </select>
                     </div>
                     <div>
-                        <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Start Time</label>
-                        <select id="eventStart" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 transition-all"></select>
+                        <label class="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Start Hour</label>
+                        <select id="eventStart" class="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all font-medium text-slate-700 appearance-none"></select>
                     </div>
                 </div>
                 <div>
-                    <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Duration (Hours)</label>
-                    <input type="number" id="eventDuration" min="1" max="12" value="1" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 transition-all">
+                    <label class="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Duration (Hours)</label>
+                    <div class="flex items-center gap-4">
+                        <input type="range" id="eventDuration" min="1" max="8" value="1" class="flex-1 accent-indigo-600" oninput="document.getElementById('durVal').innerText = this.value + 'h'">
+                        <span id="durVal" class="bg-indigo-50 text-indigo-700 px-4 py-2 rounded-lg font-bold min-w-[50px] text-center">1h</span>
+                    </div>
                 </div>
                 <div>
-                    <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Theme Color</label>
-                    <div class="flex flex-wrap gap-3 mt-2">
-                        <button onclick="setColor('#EEF2FF', '#4F46E5')" class="w-10 h-10 rounded-full bg-[#EEF2FF] border-2 border-indigo-200 hover:scale-110 transition-transform" data-color="#EEF2FF"></button>
-                        <button onclick="setColor('#F0FDF4', '#16A34A')" class="w-10 h-10 rounded-full bg-[#F0FDF4] border-2 border-green-200 hover:scale-110 transition-transform" data-color="#F0FDF4"></button>
-                        <button onclick="setColor('#FEF2F2', '#DC2626')" class="w-10 h-10 rounded-full bg-[#FEF2F2] border-2 border-red-200 hover:scale-110 transition-transform" data-color="#FEF2F2"></button>
-                        <button onclick="setColor('#FFFBEB', '#D97706')" class="w-10 h-10 rounded-full bg-[#FFFBEB] border-2 border-yellow-200 hover:scale-110 transition-transform" data-color="#FFFBEB"></button>
-                        <button onclick="setColor('#FAF5FF', '#9333EA')" class="w-10 h-10 rounded-full bg-[#FAF5FF] border-2 border-purple-200 hover:scale-110 transition-transform" data-color="#FAF5FF"></button>
-                    </div>
+                    <label class="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Theme</label>
+                    <div class="flex flex-wrap gap-4 mt-2" id="colorPicker"></div>
                 </div>
             </div>
-            <div class="flex flex-col md:flex-row justify-between mt-10 gap-4">
-                <button onclick="deleteEvent()" id="deleteBtn" class="text-red-500 font-semibold hover:bg-red-50 px-4 py-2 rounded-lg transition-colors hidden">Delete Event</button>
-                <div class="flex gap-3 ml-auto">
-                    <button onclick="closeModal()" class="px-6 py-2.5 text-slate-500 font-medium hover:bg-slate-100 rounded-xl transition-all">Cancel</button>
-                    <button onclick="saveEvent()" class="px-8 py-2.5 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 shadow-lg shadow-indigo-200 transition-all">Save</button>
+            <div class="flex flex-col md:flex-row justify-between mt-12 gap-4 border-t border-slate-100 pt-8">
+                <button onclick="deleteEvent()" id="deleteBtn" class="text-red-500 font-bold hover:bg-red-50 px-6 py-3 rounded-xl transition-colors hidden">Delete</button>
+                <div class="flex gap-4 ml-auto w-full md:w-auto">
+                    <button onclick="closeModal()" class="flex-1 md:flex-none px-8 py-3 text-slate-500 font-bold hover:bg-slate-50 rounded-xl transition-all border border-transparent">Cancel</button>
+                    <button onclick="saveEvent()" class="flex-1 md:flex-none px-10 py-3 bg-indigo-600 text-white font-black rounded-xl hover:bg-indigo-700 shadow-xl shadow-indigo-100 transition-all">Save</button>
                 </div>
             </div>
         </div>
@@ -146,67 +146,79 @@
         const modal = document.getElementById('modal');
         const timeStart = 8;
         const timeEnd = 22;
-        let events = JSON.parse(localStorage.getItem('cos_events')) || [
-            { id: 1, title: 'Inha University', day: 1, start: 10, duration: 3, bg: '#EEF2FF', border: '#4F46E5' },
-            { id: 2, title: 'CS2 Training', day: 3, start: 20, duration: 2, bg: '#FEF2F2', border: '#DC2626' }
+        const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+        const themes = [
+            { bg: '#EFF6FF', border: '#3B82F6', text: '#1E40AF' },
+            { bg: '#F0FDF4', border: '#22C55E', text: '#166534' },
+            { bg: '#FEF2F2', border: '#EF4444', text: '#991B1B' },
+            { bg: '#FFFBEB', border: '#F59E0B', text: '#92400E' },
+            { bg: '#FAF5FF', border: '#A855F7', text: '#6B21A8' },
+            { bg: '#FDF2F8', border: '#EC4899', text: '#9D174D' }
+        ];
+        
+        let events = JSON.parse(localStorage.getItem('cos_events_v2')) || [
+            { id: 1, title: 'Inha University', day: 1, start: 10, duration: 3, themeIdx: 0 },
+            { id: 2, title: 'CS2 Training', day: 3, start: 20, duration: 2, themeIdx: 2 }
         ];
         let editingId = null;
-        let selectedBg = '#EEF2FF';
-        let selectedBorder = '#4F46E5';
+        let selectedThemeIdx = 0;
 
         function init() {
             lucide.createIcons();
             renderGrid();
             renderEvents();
             populateTimeDropdowns();
+            renderColorPicker();
         }
 
         function renderGrid() {
-            for (let hour = timeStart; hour < timeEnd; hour++) {
-                const label = document.createElement('div');
-                label.className = 'time-label';
-                label.textContent = `${hour}:00`;
-                scheduler.appendChild(label);
+            scheduler.innerHTML = '<div class="label-cell">Day / Time</div>';
+            for (let h = timeStart; h < timeEnd; h++) {
+                const hCell = document.createElement('div');
+                hCell.className = 'label-cell';
+                hCell.textContent = `${h}:00`;
+                scheduler.appendChild(hCell);
+            }
 
-                for (let day = 1; day <= 7; day++) {
+            days.forEach((day, idx) => {
+                const dayCell = document.createElement('div');
+                dayCell.className = 'label-cell';
+                dayCell.textContent = day;
+                scheduler.appendChild(dayCell);
+
+                for (let h = timeStart; h < timeEnd; h++) {
                     const cell = document.createElement('div');
                     cell.className = 'grid-cell';
-                    cell.dataset.day = day;
-                    cell.dataset.hour = hour;
-                    cell.ondragover = (e) => e.preventDefault();
-                    cell.ondrop = (e) => handleDrop(e, day, hour);
+                    cell.dataset.day = idx + 1;
+                    cell.dataset.hour = h;
                     scheduler.appendChild(cell);
                 }
-            }
+            });
         }
 
         function renderEvents() {
             document.querySelectorAll('.block').forEach(b => b.remove());
             events.forEach(event => {
+                const theme = themes[event.themeIdx];
                 const block = document.createElement('div');
-                block.className = `block shadow-sm border-l-4`;
-                block.style.backgroundColor = event.bg;
-                block.style.borderColor = event.border;
-                block.style.gridColumn = event.day + 1;
-                block.style.gridRow = `${event.start - timeStart + 2} / span ${event.duration}`;
+                block.className = `block border-l-4`;
+                block.style.backgroundColor = theme.bg;
+                block.style.borderColor = theme.border;
+                block.style.color = theme.text;
+                
+                block.style.gridRow = event.day + 1;
+                block.style.gridColumn = `${event.start - timeStart + 2} / span ${event.duration}`;
                 
                 block.innerHTML = `
-                    <div class="font-bold truncate text-slate-800">${event.title}</div>
-                    <div class="text-[10px] font-medium opacity-60">${event.start}:00 - ${event.start + event.duration}:00</div>
+                    <div class="font-black truncate uppercase text-[0.65rem] tracking-wider mb-1 opacity-70">${event.start}:00</div>
+                    <div class="font-bold text-sm leading-tight">${event.title}</div>
                 `;
                 
-                block.draggable = true;
                 block.onclick = (e) => { e.stopPropagation(); openEditModal(event.id); };
-                block.ondragstart = (e) => {
-                    e.dataTransfer.setData('text/plain', event.id);
-                    block.classList.add('dragging');
-                };
-                block.ondragend = () => block.classList.remove('dragging');
-
                 if (checkConflict(event)) block.classList.add('conflict');
                 scheduler.appendChild(block);
             });
-            localStorage.setItem('cos_events', JSON.stringify(events));
+            localStorage.setItem('cos_events_v2', JSON.stringify(events));
         }
 
         function checkConflict(event) {
@@ -216,17 +228,6 @@
                 ((event.start >= e.start && event.start < e.start + e.duration) ||
                  (e.start >= event.start && e.start < event.start + event.duration))
             );
-        }
-
-        function handleDrop(e, day, hour) {
-            e.preventDefault();
-            const id = parseInt(e.dataTransfer.getData('text/plain'));
-            const event = events.find(ev => ev.id === id);
-            if (event) {
-                event.day = day;
-                event.start = hour;
-                renderEvents();
-            }
         }
 
         function populateTimeDropdowns() {
@@ -239,11 +240,29 @@
             }
         }
 
+        function renderColorPicker() {
+            const picker = document.getElementById('colorPicker');
+            themes.forEach((t, i) => {
+                const btn = document.createElement('button');
+                btn.className = `w-12 h-12 rounded-full border-4 transition-all hover:scale-110`;
+                btn.style.backgroundColor = t.bg;
+                btn.style.borderColor = (i === selectedThemeIdx) ? t.border : 'transparent';
+                btn.onclick = () => {
+                    selectedThemeIdx = i;
+                    document.querySelectorAll('#colorPicker button').forEach((b, idx) => {
+                        b.style.borderColor = (idx === i) ? themes[idx].border : 'transparent';
+                    });
+                };
+                picker.appendChild(btn);
+            });
+        }
+
         function addBlock() {
             editingId = null;
-            document.getElementById('modalTitle').textContent = 'Create Event';
+            document.getElementById('modalTitle').textContent = 'New Event';
             document.getElementById('eventTitle').value = '';
             document.getElementById('eventDuration').value = 1;
+            document.getElementById('durVal').innerText = '1h';
             document.getElementById('deleteBtn').classList.add('hidden');
             modal.classList.remove('hidden');
         }
@@ -256,30 +275,25 @@
             document.getElementById('eventDay').value = event.day;
             document.getElementById('eventStart').value = event.start;
             document.getElementById('eventDuration').value = event.duration;
+            document.getElementById('durVal').innerText = event.duration + 'h';
             document.getElementById('deleteBtn').classList.remove('hidden');
-            selectedBg = event.bg;
-            selectedBorder = event.border;
+            selectedThemeIdx = event.themeIdx;
             modal.classList.remove('hidden');
         }
 
         function closeModal() { modal.classList.add('hidden'); }
 
-        function setColor(bg, border) {
-            selectedBg = bg;
-            selectedBorder = border;
-        }
-
         function saveEvent() {
-            const title = document.getElementById('eventTitle').value || 'New Event';
+            const title = document.getElementById('eventTitle').value || 'Untitled';
             const day = parseInt(document.getElementById('eventDay').value);
             const start = parseInt(document.getElementById('eventStart').value);
             const duration = parseInt(document.getElementById('eventDuration').value);
 
             if (editingId) {
                 const event = events.find(e => e.id === editingId);
-                Object.assign(event, { title, day, start, duration, bg: selectedBg, border: selectedBorder });
+                Object.assign(event, { title, day, start, duration, themeIdx: selectedThemeIdx });
             } else {
-                events.push({ id: Date.now(), title, day, start, duration, bg: selectedBg, border: selectedBorder });
+                events.push({ id: Date.now(), title, day, start, duration, themeIdx: selectedThemeIdx });
             }
             renderEvents();
             closeModal();
@@ -295,9 +309,9 @@
 
         function downloadImage() {
             const element = document.getElementById('capture-area');
-            html2canvas(element, { scale: 2, backgroundColor: '#f8fafc' }).then(canvas => {
+            html2canvas(element, { scale: 3, backgroundColor: '#f8fafc' }).then(canvas => {
                 const link = document.createElement('a');
-                link.download = 'cos-week.png';
+                link.download = 'cos-week-schedule.png';
                 link.href = canvas.toDataURL('image/png');
                 link.click();
             });
