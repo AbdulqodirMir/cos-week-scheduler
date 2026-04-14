@@ -74,12 +74,13 @@
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
         /* Specific styles for PNG capture to avoid layout issues */
         .capture-mode {
-            width: max-content !important;
+            width: 1400px !important;
             padding: 40px !important;
             max-width: none !important;
         }
         .capture-mode .overflow-x-auto {
             overflow: visible !important;
+            max-width: none !important;
         }
         .capture-mode .grid-container {
             min-width: 1320px !important;
@@ -369,11 +370,17 @@
             html2canvas(element, { 
                 scale: 3, 
                 backgroundColor: '#f8fafc', 
-                borderRadius: 40,
                 windowWidth: 1400,
                 onclone: (clonedDoc) => {
+                    clonedDoc.documentElement.style.width = '1400px';
+                    clonedDoc.body.style.width = '1400px';
                     const clonedElement = clonedDoc.getElementById('capture-area');
                     clonedElement.classList.add('capture-mode');
+                    const wrapper = clonedElement.querySelector('.overflow-x-auto');
+                    if (wrapper) {
+                        wrapper.style.overflow = 'visible';
+                        wrapper.style.maxWidth = 'none';
+                    }
                 }
             }).then(canvas => {
                 const link = document.createElement('a');
