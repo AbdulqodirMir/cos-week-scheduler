@@ -1,32 +1,309 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Cos' Week Scheduler</title>
-  <meta name="description" content="A drag-to-create weekly schedule builder with conflict detection. Built with vanilla HTML/CSS/JS.">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cos' week</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <style>
+        .grid-container {
+            display: grid;
+            grid-template-columns: 80px repeat(7, 1fr);
+            grid-template-rows: 50px repeat(14, 60px);
+        }
+        .time-label, .day-label {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            font-size: 0.8rem;
+            color: #64748b;
+        }
+        .grid-cell {
+            border: 1px solid #f1f5f9;
+            position: relative;
+        }
+        .block {
+            position: absolute;
+            inset: 2px;
+            border-radius: 6px;
+            padding: 8px;
+            font-size: 0.75rem;
+            cursor: move;
+            user-select: none;
+            z-index: 10;
+            overflow: hidden;
+            border: 1px solid rgba(0,0,0,0.05);
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+        .block:hover {
+            filter: brightness(0.95);
+            z-index: 20;
+        }
+        .conflict {
+            border: 2px solid #ef4444 !important;
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
+            70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
+        .dragging { opacity: 0.5; }
+        #modal.hidden { display: none; }
+        #modal:not(.hidden) { display: flex; }
+    </style>
 </head>
-<body>
-  <h1>Cos' Week Scheduler</h1>
-  <p>Loading app...</p>
-  <p>📝 <strong>Note:</strong> This is a placeholder. The full app code is available on <a href="https://codepen.io/pen">CodePen</a>.</p>
-  <p>To deploy the full app here:</p>
-  <ol>
-    <li>Copy all HTML/CSS/JS from the CodePen above</li>
-    <li>Edit this file on GitHub</li>
-    <li>Replace content with the full single-file app</li>
-    <li>Commit & enable GitHub Pages</li>
-  </ol>
-  
-  <hr>
-  <h2>Features</h2>
-  <ul>
-    <li>✅ Drag to create blocks</li>
-    <li>✅ Click to edit/delete</li>
-    <li>✅ Conflict detection with red highlight</li>
-    <li>✅ Auto-adjust or force place</li>
-    <li>✅ Export/Import JSON</li>
-    <li>✅ Print/PDF export</li>
-  </ul>
+<body class="bg-slate-50 min-h-screen p-4 md:p-8">
+    <div class="max-w-6xl mx-auto bg-white rounded-xl shadow-xl p-6" id="capture-area">
+        <header class="flex flex-col md:flex-row justify-between items-center gap-4 mb-8">
+            <div>
+                <h1 class="text-3xl font-extrabold text-slate-900 tracking-tight">Cos' week</h1>
+                <p class="text-slate-500 text-sm mt-1">Interactive Visual Scheduler</p>
+            </div>
+            <div class="flex gap-3">
+                <button onclick="addBlock()" class="bg-indigo-600 text-white px-5 py-2.5 rounded-xl flex items-center gap-2 hover:bg-indigo-700 transition-all shadow-sm font-medium">
+                    <i data-lucide="plus" class="w-4 h-4"></i> Add Event
+                </button>
+                <button onclick="downloadImage()" class="bg-white text-slate-700 border border-slate-200 px-5 py-2.5 rounded-xl flex items-center gap-2 hover:bg-slate-50 transition-all shadow-sm font-medium">
+                    <i data-lucide="camera" class="w-4 h-4"></i> Export PNG
+                </button>
+            </div>
+        </header>
+
+        <div id="scheduler" class="grid-container rounded-xl overflow-hidden border border-slate-200 shadow-inner">
+            <div class="day-label">Time</div>
+            <div class="day-label">Mon</div>
+            <div class="day-label">Tue</div>
+            <div class="day-label">Wed</div>
+            <div class="day-label">Thu</div>
+            <div class="day-label">Fri</div>
+            <div class="day-label">Sat</div>
+            <div class="day-label">Sun</div>
+        </div>
+    </div>
+
+    <!-- Modal -->
+    <div id="modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm hidden items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-2xl p-8 w-full max-w-md shadow-2xl scale-in-center">
+            <h2 id="modalTitle" class="text-2xl font-bold text-slate-900 mb-6">Create Event</h2>
+            <div class="space-y-5">
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Event Name</label>
+                    <input type="text" id="eventTitle" placeholder="e.g. Computer Architecture" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 transition-all">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Day</label>
+                        <select id="eventDay" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 transition-all">
+                            <option value="1">Monday</option>
+                            <option value="2">Tuesday</option>
+                            <option value="3">Wednesday</option>
+                            <option value="4">Thursday</option>
+                            <option value="5">Friday</option>
+                            <option value="6">Saturday</option>
+                            <option value="7">Sunday</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Start Time</label>
+                        <select id="eventStart" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 transition-all"></select>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Duration (Hours)</label>
+                    <input type="number" id="eventDuration" min="1" max="12" value="1" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 transition-all">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Theme Color</label>
+                    <div class="flex flex-wrap gap-3 mt-2">
+                        <button onclick="setColor('#EEF2FF', '#4F46E5')" class="w-10 h-10 rounded-full bg-[#EEF2FF] border-2 border-indigo-200 hover:scale-110 transition-transform" data-color="#EEF2FF"></button>
+                        <button onclick="setColor('#F0FDF4', '#16A34A')" class="w-10 h-10 rounded-full bg-[#F0FDF4] border-2 border-green-200 hover:scale-110 transition-transform" data-color="#F0FDF4"></button>
+                        <button onclick="setColor('#FEF2F2', '#DC2626')" class="w-10 h-10 rounded-full bg-[#FEF2F2] border-2 border-red-200 hover:scale-110 transition-transform" data-color="#FEF2F2"></button>
+                        <button onclick="setColor('#FFFBEB', '#D97706')" class="w-10 h-10 rounded-full bg-[#FFFBEB] border-2 border-yellow-200 hover:scale-110 transition-transform" data-color="#FFFBEB"></button>
+                        <button onclick="setColor('#FAF5FF', '#9333EA')" class="w-10 h-10 rounded-full bg-[#FAF5FF] border-2 border-purple-200 hover:scale-110 transition-transform" data-color="#FAF5FF"></button>
+                    </div>
+                </div>
+            </div>
+            <div class="flex flex-col md:flex-row justify-between mt-10 gap-4">
+                <button onclick="deleteEvent()" id="deleteBtn" class="text-red-500 font-semibold hover:bg-red-50 px-4 py-2 rounded-lg transition-colors hidden">Delete Event</button>
+                <div class="flex gap-3 ml-auto">
+                    <button onclick="closeModal()" class="px-6 py-2.5 text-slate-500 font-medium hover:bg-slate-100 rounded-xl transition-all">Cancel</button>
+                    <button onclick="saveEvent()" class="px-8 py-2.5 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 shadow-lg shadow-indigo-200 transition-all">Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const scheduler = document.getElementById('scheduler');
+        const modal = document.getElementById('modal');
+        const timeStart = 8;
+        const timeEnd = 22;
+        let events = JSON.parse(localStorage.getItem('cos_events')) || [
+            { id: 1, title: 'Inha University', day: 1, start: 10, duration: 3, bg: '#EEF2FF', border: '#4F46E5' },
+            { id: 2, title: 'CS2 Training', day: 3, start: 20, duration: 2, bg: '#FEF2F2', border: '#DC2626' }
+        ];
+        let editingId = null;
+        let selectedBg = '#EEF2FF';
+        let selectedBorder = '#4F46E5';
+
+        function init() {
+            lucide.createIcons();
+            renderGrid();
+            renderEvents();
+            populateTimeDropdowns();
+        }
+
+        function renderGrid() {
+            for (let hour = timeStart; hour < timeEnd; hour++) {
+                const label = document.createElement('div');
+                label.className = 'time-label';
+                label.textContent = `${hour}:00`;
+                scheduler.appendChild(label);
+
+                for (let day = 1; day <= 7; day++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'grid-cell';
+                    cell.dataset.day = day;
+                    cell.dataset.hour = hour;
+                    cell.ondragover = (e) => e.preventDefault();
+                    cell.ondrop = (e) => handleDrop(e, day, hour);
+                    scheduler.appendChild(cell);
+                }
+            }
+        }
+
+        function renderEvents() {
+            document.querySelectorAll('.block').forEach(b => b.remove());
+            events.forEach(event => {
+                const block = document.createElement('div');
+                block.className = `block shadow-sm border-l-4`;
+                block.style.backgroundColor = event.bg;
+                block.style.borderColor = event.border;
+                block.style.gridColumn = event.day + 1;
+                block.style.gridRow = `${event.start - timeStart + 2} / span ${event.duration}`;
+                
+                block.innerHTML = `
+                    <div class="font-bold truncate text-slate-800">${event.title}</div>
+                    <div class="text-[10px] font-medium opacity-60">${event.start}:00 - ${event.start + event.duration}:00</div>
+                `;
+                
+                block.draggable = true;
+                block.onclick = (e) => { e.stopPropagation(); openEditModal(event.id); };
+                block.ondragstart = (e) => {
+                    e.dataTransfer.setData('text/plain', event.id);
+                    block.classList.add('dragging');
+                };
+                block.ondragend = () => block.classList.remove('dragging');
+
+                if (checkConflict(event)) block.classList.add('conflict');
+                scheduler.appendChild(block);
+            });
+            localStorage.setItem('cos_events', JSON.stringify(events));
+        }
+
+        function checkConflict(event) {
+            return events.some(e => 
+                e.id !== event.id && 
+                e.day === event.day && 
+                ((event.start >= e.start && event.start < e.start + e.duration) ||
+                 (e.start >= event.start && e.start < event.start + event.duration))
+            );
+        }
+
+        function handleDrop(e, day, hour) {
+            e.preventDefault();
+            const id = parseInt(e.dataTransfer.getData('text/plain'));
+            const event = events.find(ev => ev.id === id);
+            if (event) {
+                event.day = day;
+                event.start = hour;
+                renderEvents();
+            }
+        }
+
+        function populateTimeDropdowns() {
+            const select = document.getElementById('eventStart');
+            for (let i = timeStart; i < timeEnd; i++) {
+                const opt = document.createElement('option');
+                opt.value = i;
+                opt.textContent = `${i}:00`;
+                select.appendChild(opt);
+            }
+        }
+
+        function addBlock() {
+            editingId = null;
+            document.getElementById('modalTitle').textContent = 'Create Event';
+            document.getElementById('eventTitle').value = '';
+            document.getElementById('eventDuration').value = 1;
+            document.getElementById('deleteBtn').classList.add('hidden');
+            modal.classList.remove('hidden');
+        }
+
+        function openEditModal(id) {
+            const event = events.find(e => e.id === id);
+            editingId = id;
+            document.getElementById('modalTitle').textContent = 'Edit Event';
+            document.getElementById('eventTitle').value = event.title;
+            document.getElementById('eventDay').value = event.day;
+            document.getElementById('eventStart').value = event.start;
+            document.getElementById('eventDuration').value = event.duration;
+            document.getElementById('deleteBtn').classList.remove('hidden');
+            selectedBg = event.bg;
+            selectedBorder = event.border;
+            modal.classList.remove('hidden');
+        }
+
+        function closeModal() { modal.classList.add('hidden'); }
+
+        function setColor(bg, border) {
+            selectedBg = bg;
+            selectedBorder = border;
+        }
+
+        function saveEvent() {
+            const title = document.getElementById('eventTitle').value || 'New Event';
+            const day = parseInt(document.getElementById('eventDay').value);
+            const start = parseInt(document.getElementById('eventStart').value);
+            const duration = parseInt(document.getElementById('eventDuration').value);
+
+            if (editingId) {
+                const event = events.find(e => e.id === editingId);
+                Object.assign(event, { title, day, start, duration, bg: selectedBg, border: selectedBorder });
+            } else {
+                events.push({ id: Date.now(), title, day, start, duration, bg: selectedBg, border: selectedBorder });
+            }
+            renderEvents();
+            closeModal();
+        }
+
+        function deleteEvent() {
+            if (editingId) {
+                events = events.filter(e => e.id !== editingId);
+                renderEvents();
+                closeModal();
+            }
+        }
+
+        function downloadImage() {
+            const element = document.getElementById('capture-area');
+            html2canvas(element, { scale: 2, backgroundColor: '#f8fafc' }).then(canvas => {
+                const link = document.createElement('a');
+                link.download = 'cos-week.png';
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+            });
+        }
+
+        init();
+    </script>
 </body>
 </html>
