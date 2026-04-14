@@ -14,7 +14,7 @@
             grid-template-rows: 40px repeat(7, 80px);
             position: relative;
             background: white;
-            min-width: 1000px; /* Ensures grid doesn't break on very small viewports while allowing full view */
+            min-width: 1000px;
         }
         .label-cell {
             display: flex;
@@ -73,6 +73,15 @@
         .custom-scrollbar::-webkit-scrollbar { height: 6px; width: 6px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+
+        /* Specific styles for PNG capture to avoid layout issues */
+        .capture-mode {
+            width: 1400px !important;
+            padding: 40px !important;
+        }
+        .capture-mode .grid-container {
+            min-width: 1320px !important;
+        }
     </style>
 </head>
 <body class="bg-slate-50 min-h-screen p-4 md:p-6 font-sans">
@@ -103,14 +112,14 @@
 
         <footer class="mt-8 pt-6 border-t border-slate-100 flex flex-col md:flex-row justify-between items-center gap-4 text-slate-400 text-[10px] font-bold uppercase tracking-[0.2em]">
             <div class="flex items-center gap-2">
-                <span class="bg-slate-100 px-3 py-1 rounded-full text-slate-500">v2.2</span>
+                <span class="bg-slate-100 px-3 py-1 rounded-full text-slate-500">v2.3</span>
                 <span>Cos' week Scheduler</span>
             </div>
             <span class="flex items-center gap-2">Built for high-performance humans <i data-lucide="zap" class="w-3 h-3 text-amber-400 fill-amber-400"></i></span>
         </footer>
     </div>
 
-    <!-- Modal remains unchanged in its logic but with smaller padding -->
+    <!-- Modal -->
     <div id="modal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-xl hidden items-center justify-center z-[100] p-4">
         <div class="bg-white rounded-[2rem] p-8 w-full max-w-lg shadow-2xl border border-slate-100 scale-in-center">
             <div class="flex justify-between items-center mb-8">
@@ -352,11 +361,27 @@
 
         function downloadImage() {
             const element = document.getElementById('capture-area');
-            html2canvas(element, { scale: 2, backgroundColor: '#f8fafc', borderRadius: 20 }).then(canvas => {
+            
+            // Add capture class for consistent dimensions in PNG
+            element.classList.add('capture-mode');
+            
+            html2canvas(element, { 
+                scale: 3, 
+                backgroundColor: '#f8fafc', 
+                borderRadius: 40,
+                windowWidth: 1400,
+                onclone: (clonedDoc) => {
+                    const clonedElement = clonedDoc.getElementById('capture-area');
+                    clonedElement.classList.add('capture-mode');
+                }
+            }).then(canvas => {
                 const link = document.createElement('a');
-                link.download = 'cos-week-scheduler-full.png';
+                link.download = 'cos-week-schedule.png';
                 link.href = canvas.toDataURL('image/png');
                 link.click();
+                
+                // Cleanup
+                element.classList.remove('capture-mode');
             });
         }
 
